@@ -42,6 +42,8 @@ foreach ($places as $place) {
 }
 
 #Walk
+#TODO go to path traveler and basically from him you could be able to loop trough all route,
+#Also i do think now that path place should have traveler dependency which would do all the traveling stuff
 $traveler = new PathTraveler($repo->findByXY(0,4));
 
 $traveler->showWhereCanGo();
