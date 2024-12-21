@@ -1,104 +1,121 @@
 <?php
 
-const RULE_SEPARATOR = '|';
-const INSTRUCTION_SEPARATOR = ',';
+const GUARD = '^';
+const BOX = '#';
 
-$content = getFileContent("files/t1.txt");
-
-$steps = $content[0];
-$instructions = $content[1];
-
-$steps = array_map(fn($sub) => array_map(fn($mem) => (int)$mem, $sub), $steps);
-$instructions = array_map(fn($sub) => array_map(fn($mem) => (int)$mem, $sub), $instructions);
-
-
-$validator = new Validator($steps, $instructions);
-$validator->validate();
-
-$validator->sumMiddles();
-print_r($validator->sumTotals .PHP_EOL);
-
-// die(var_dump($validator->validInstructions, $validator->invalidInstructions));
-
-class Validator
+enum DIRECTION: string
 {
-    public array $validInstructions = [];
-    public array $invalidInstructions = [];
+    case UP = 'U';
+    case RIGHT = 'R';
+    case DOWN = 'D';
+    case LEFT = 'L';
+}
 
-    private array $ruleSet = [];
-    public int $sumTotals = 0;
+$map = getFileContent("files/t1.txt");
 
-    public function __construct(public array $steps, public array $instructions) {}
+$traveled = [];
 
-    public function sumMiddles(): void
-    {
-        foreach ($this->validInstructions as $validInstruction) {
-            $middleIndex = (count($validInstruction) - 1) / 2;
-            $this->sumTotals += $validInstruction[$middleIndex];
-        };
+[$startX, $startY] = findGuard(0, 0, $map);
+
+travel($startX, $startY, $map, $traveled, Direction::UP);
+
+$total = 0;
+
+foreach ($traveled as $travel) {
+    $total += count($travel);
+}
+
+die(var_dump($total));
+
+function travel($x, $y, $map, &$traveled, $direction, $lastX = null, $lastY = null)
+{
+    // die(var_dump($direction->value));
+    $dir = $direction->value;
+    // die(var_dump($dir));
+    // print_r("\tArrived at: x: $x y: $y, direction: $dir \t from x: $lastX, y: $lastY \n");
+
+    if (!isset($map[$x]) || !isset($map[$y])) {
+        return $traveled;
     }
+    if ($map[$x][$y] !== BOX) {
+        isset($traveled[$x][$y]) ? $traveled[$x][$y]++ : $traveled[$x][$y] = 1;
 
-    public function validate(): void
-    {
-        $this->prepareRuleSet();
-
-        foreach ($this->instructions as $instruction) {
-            foreach ($instruction as $number) {
-
-                $valid = $this->checkIfInPlace($number, $instruction);
-                // var_dump([$number, $valid]);
-
-                if (!$valid) {
-                    $this->invalidInstructions[] = $instruction;
-                    continue 2;
-                }
-            }
-            $this->validInstructions[] = $instruction;
-        }
+        $lastX = $x;
+        $lastY = $y;
+    } else {
+        $direction = changeDirection($direction);
+        $x = $lastX;
+        $y = $lastY;
     }
-
-    private function checkIfInPlace(int $number, array $instruction)
-    {
-
-
-        if (isset($this->ruleSet[$number])) {
-            $indexOfSubject = array_search($number, $instruction);
-            $arrayBefore = array_slice($instruction, 0, $indexOfSubject);
-
-            foreach ($this->ruleSet[$number] as $suspect) {
-                if (in_array($suspect, $arrayBefore)) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    private function prepareRuleSet(): void
-    {
-        foreach ($this->steps as $step) {
-            $this->ruleSet[$step[0]][] = $step[1];
-        }
+    switch ($direction) {
+        case DIRECTION::UP:
+            return travel(--$x, $y, $map, $traveled, $direction, $lastX, $lastY);
+            break;
+        case DIRECTION::RIGHT:
+            return travel($x, ++$y, $map, $traveled, $direction, $lastX, $lastY);
+            break;
+        case DIRECTION::DOWN:
+            return travel(++$x, $y, $map, $traveled, $direction, $lastX, $lastY);
+            break;
+        case DIRECTION::LEFT:
+            return travel($x, --$y, $map, $traveled, $direction, $lastX, $lastY);
+            break;
     }
 }
 
+function changeDirection(DIRECTION $direction): DIRECTION
+{
+    if ($direction === DIRECTION::UP) {
+        return DIRECTION::RIGHT;
+    }
+    if ($direction === DIRECTION::RIGHT) {
+        return DIRECTION::DOWN;
+    }
+    if ($direction === DIRECTION::DOWN) {
+        return DIRECTION::LEFT;
+    }
+    if ($direction === DIRECTION::LEFT) {
+        return DIRECTION::UP;
+    }
+}
 
 function getFileContent($path): array
 {
     $lines = file($path);
+    $map = [];
 
-    $sequences = [];
-    $instructions = [];
+    foreach ($lines as $x => $lineContent) {
 
-    foreach ($lines as $lineContent) {
-        if (!empty($lineContent)) {
-            if (strpos($lineContent, RULE_SEPARATOR)) {
-                $sequences[] = explode(RULE_SEPARATOR, $lineContent);
-            } elseif (strpos($lineContent, INSTRUCTION_SEPARATOR)) {
-                $instructions[] = explode(INSTRUCTION_SEPARATOR, $lineContent);
-            }
+        $lineContent = trim($lineContent, "\n");
+        $ygriks = str_split($lineContent);
+        foreach ($ygriks as $y => $value) {
+            $map[$x][$y] = $value;
         }
     }
 
-    return [$sequences, $instructions];
+    return $map;
+}
+
+function findGuard($x, $y, $map): array
+{
+
+    $maxY = count($map[0]) - 1;
+    // $ob = $map[$x][$y];
+    // var_dump("x:$x y:{$y} object - |$ob|}" . PHP_EOL);
+
+    if (!isset($map[$x]) || !isset($map[$y])) {
+        throw new Exception("Not found || nugrybavo  x: $x y: $y");
+    }
+
+    if ($map[$x][$y] === GUARD) {
+        return [$x, $y];
+    }
+
+    if ($maxY === $y) {
+        $x += 1;
+        return findGuard($x++, 0, $map);
+    } else {
+        $y += 1;
+        return findGuard($x, $y++, $map);
+    }
 }
